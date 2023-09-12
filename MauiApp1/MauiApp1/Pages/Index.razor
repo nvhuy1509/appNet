@@ -1,0 +1,57 @@
+﻿@page "/dashboard"
+@using MauiApp1.Services
+@using MauiApp1.Models
+@using Microsoft.Office.Core;
+@using Microsoft.Office.Interop.PowerPoint
+@using System.Diagnostics;
+@using System.Security.Cryptography;
+@using System.Text;
+@using Newtonsoft.Json;
+@inject IAppService AppService;
+@inject IJSRuntime JS
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    </head>
+    <body>
+        <div class>
+            <div class="page-main">
+                <div class="row container">
+                    <NavLink href="/">
+                        <span class="btn btn-primary">Trở về</span>
+                    </NavLink>
+                    @if (resultList == null)
+                    {
+                        <h1>Loading.....</h1>
+                    }
+                    else
+                    {
+                        @foreach (var item in resultList)
+                        {
+                            <SurveyPrompt item="@item" type="1" />
+                        }
+                    }
+
+                </div>
+            </div>
+        </div>
+
+
+         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+
+    </body>
+</html>
+
+@code {
+    List<ListFileModel> resultList = new List<ListFileModel>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        resultList = await AppService.GetFilePublished();
+    }
+}
+

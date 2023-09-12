@@ -1,0 +1,67 @@
+﻿@page "/"
+@using Newtonsoft.Json.Linq;
+@using MauiApp1.Models
+@using MauiApp1.Services
+@using Newtonsoft.Json
+@inject IAppService AppService;
+@inject NavigationManager NavManager;
+
+<EditForm Model="@loginModel" OnValidSubmit="Submit">
+    <DataAnnotationsValidator />
+    <div class="main">
+        <div class="page-main">
+            <div class="form-main">
+                <div class="form-main-img">
+                    <img src="../images/icon-stem.png" />
+                </div>
+                <input id="username" @bind-value="loginModel.Username" class="form-user" type="text" placeholder="Tên đăng nhập" />
+                <ValidationMessage For="@(()=>loginModel.Username)" />
+                <input id="password" @bind-value="loginModel.Password" class="form-password" type="password" placeholder="Mật khẩu" />
+                <ValidationMessage For="@(()=>loginModel.Password)" />
+                <button type="button" @onclick="Submit" class="form-button">
+                    <span class="@_spinnerClass" role="status" aria-hidden="true"></span>
+                    Đăng nhập
+                </button>
+                
+                <button type="button" class="form-button">
+                    <NavLink href="/offline" class="btn-offline">
+                        Dạy offline
+                    </NavLink>
+                </button>
+                
+            </div>
+        </div>
+    </div>
+</EditForm>
+
+
+@code {
+    LoginModel loginModel = new();
+
+    private string _spinnerClass = "";
+    private async void Submit()
+    {
+        _spinnerClass = "spinner-border spinner-border-sm";
+
+        if (loginModel.Username != null && loginModel.Password != null)
+        {
+            var response = await AppService.Login(loginModel);
+            JObject result = JObject.Parse(response);
+            if ((bool)result["success"] == true)
+            {
+                NavManager.NavigateTo("/dashboard");
+            }
+            else
+            {
+                await App.Current.MainPage.DisplayAlert("Error", (string)result["message"], "OK");
+            }
+        }
+        else
+        {
+            await App.Current.MainPage.DisplayAlert("Error", "Bạn phải nhập đầy đủ Username và Password", "OK");
+        }
+
+        _spinnerClass = "";
+        this.StateHasChanged();
+    }
+}

@@ -1,0 +1,344 @@
+﻿@using MauiApp1.Services
+@using MauiApp1.Models
+@using Microsoft.Office.Core;
+@using Microsoft.Office.Interop.PowerPoint
+@using System.Diagnostics;
+@using System.Security.Cryptography;
+@using System.Text;
+@using Microsoft.JSInterop
+@using Newtonsoft.Json;
+@inject IAppService AppService;
+@inject IJSRuntime JS
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+@if(type == 1)
+{
+    <div class="col-md-4">
+        <div class="card">
+            <img class="card-img-top" src="https://stemschool.vn/@item.Icon" alt="Card image cap">
+            <div class="card-body">
+                <h5 class="card-title">@item.Name</h5>
+                <p class="card-text">@item.Description</p>
+                <div>
+                    <div class="btn-donwload" style="display: @display">
+                        <button id="btnDownload{@item.Id}" class="btn btn-primary" @onclick="() => DownloadPptx(item)">
+                            Tải slide
+                        </button>
+                    </div>
+                    <div class="@nameClass" style="display:@displayAnim"> </div>
+                    <div class="list-btn" style="display: @displayLstBtn" id="listBtn{@item.Id}">
+                        <button href="#!" @onclick="() => OpenPptx(item)" class="btn btn-primary"><i class="fa fa-eye"></i> Xem slide</button>
+                        <button href="#!" @onclick="() => OpenGiaoAn(item)" class="btn btn-outline-purple"><i class="fa fa-book"></i> Giáo án</button>
+                        <button href="#!" @onclick="() => deleteFile(item)" class="btn btn-outline-danger"><i class="fa fa-trash"></i> Xoá</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+} 
+@if(type == 2)
+{
+    <div class="col-md-4" style="display: @itemFileOffline">
+        <div class="card">
+            <img class="card-img-top" src="https://stemschool.vn/@item.Icon" alt="Card image cap">
+            <div class="card-body">
+                <h5 class="card-title">@item.Name</h5>
+                <p class="card-text">@item.Description</p>
+                <div>
+                    <div class="list-btn" style="display: @displayLstBtn" id="listBtn{@item.Id}">
+                        <button href="#!" @onclick="() => OpenPptx(item)" class="btn btn-primary"><i class="fa fa-eye"></i> Xem slide</button>
+                        <button href="#!" @onclick="() => OpenGiaoAn(item)" class="btn btn-outline-purple"><i class="fa fa-book"></i> Giáo án</button>
+                        <button href="#!" @onclick="() => deleteFile(item)" class="btn btn-outline-danger"><i class="fa fa-trash"></i> Xoá</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
+@code {
+    // Demonstrates how a parent component can supply parameters
+    [Parameter]
+    public ListFileModel item { get; set; }
+
+    [Parameter]
+    public int type { get; set; }  // type = 1 : dạy online; type = 2: dạy offline
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; }
+
+    protected string displayLstBtn = "none";
+    protected string display = "flex";
+    protected string displayAnim = "none";
+    protected string itemFileOffline = "block";
+    protected string nameClass = "btn-animation";
+    private static string privateKey = "<RSAKeyValue><Modulus>lfH+E409Hv2Yx7ieTxOcpixdn4B8P4sFER+Y9YPJM+6poA1MQszGwXF1us07HZpZVP2nfvNfkQ6o1Y8GK59BsUrDunfGeSCMo3fNN32uPiB2s62TR1Tb0u7+c6/H0pQqOgO0RJOtVjvl3pAd3IJCTPBC71SEMI2OIe/tQlOvGRef+uj8c8VOS8s5kq925TZyr8EQnkbd43vppAvxMTWaYqJjbetRE3o+TjZJ6iaeMEb1bXUpqUgdK8v8xrVy/ou+D+sRxOrwrhwP0vIbxROebK8cQQw84bsC9ExXio4j6s0cSQ/TSAq5w9bsX/kBCiCtHlLPUDYHt/gRBhL/35dqqQ==</Modulus><Exponent>AQAB</Exponent><P>px5NLLAwqj2dDF2Ldn+zpewShGaOR2QfKrKHE9KKI79S9me4yiA2SrRvow9MJqB5QfoxiNoxNHsu7zO4z8Gg4agVfZTIrpLt794CBSRlJEb97OMmyTKqxtsBPuXwtvelcfjIrr9QLlf76S2hMOhoL9VJOIW/8Ih6AVj6EByU+BM=</P><Q>5bGFaOS/ztaxXn3yePR5LtLPNO0STqxuDPS2k4z3ORPO2LwlvgYOAol5LA1db+w0ddEJS98BF5+JUpsrz74kjVe4kU73q3iNKGcUPuO7KJ2VePdnsGQ5UP60hhsW8WBRbFGk/aKt+wzJ4YjClNhWtWbkdje+cCGSk51CtbtpodM=</Q><DP>LkT8dw/9GVVfwwmvUErBEYJQCipe4DM/UdIGBh33szgIn0JObmAGyB42/n2Axv0NNZAw4MQQdYhZkU7Pr23bvj6MXK2x9mulxxC/nG7cNfQV391wYqpNkCsYqDJ/uBjOzMRlw8QiTgJ8M643f9QI7J1v3V9iqhUPOopJCebv89M=</DP><DQ>aliJwyn94H8oee5oQDY4kURLaV7GFiThgyAeFCy1Hfkc0N4zv0pAXE5YCtxZQYOkOlRBMJ6ce9qCkvuDClknxUUzEBv2sa5L9MPc7M01jzV+yhYKLPIKU4TKAjkyoykMKdGXSVNzqAOgyMowBQgxBSYRauaeRn5UxgGOrGOMIb8=</DQ><InverseQ>gwJX7KoiXKZ0X7CW16RmzqA5YyU3f94xN9t2zrAUHYkXTT3nx9B6vuS9/EBwqYQf0zjfqK6BGK2dk3xvfCW8yBIsGYL1+pouiMtuSgxjq9/r4psyxEk6fj31a1AIpAcCeHlsYfgsWO1Set32CAK87sxpJShUAREnIYb96cE+ylc=</InverseQ><D>BfQHrGsNJC/ZYwSXdHhI3eghB3YoeLViTB2/CvBiiqdNIMemYXiT45ZHoFUJpdE8/rzba5TqFG5KkcAN9KlsCEf5oWuj+6cpLkxRX4Sj6F+NlvCrSke6OpO2ko1GF7w+OPNwstBSL3xNUhrStLCPRVK8tZfbb7oPDJXkC6Aa8ZoIxMss5mf41y0jX+6dfAVvueKEKriTXXKQqoLeN286inoGaTI8v/5GReltmL8AEKTC56/9M1MKa+0mnTQzUXM6LF+af6obNPXDHmS+GghnEkpXYZZYrJ3/05xq0P7/5QKQj42MkdGp4bxiY8NDCVTShM4IjwqvnUPeNxrATxDoKQ==</D></RSAKeyValue>"; // private key
+
+    private string KEY_PPTX = "KEY-PPTX";
+
+    List<ListFileModel> listDataStorage = new List<ListFileModel>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        string rootPath = @"C:\StemApp";
+        string[] dirs = Directory.GetDirectories(rootPath, "*", SearchOption.TopDirectoryOnly);
+
+        foreach (string dir in dirs)
+        {
+            if (dir.Contains(item.Id.ToString()))
+            {
+                display = "none";
+                displayAnim = "none";
+                displayLstBtn = "flex";
+            }
+        }
+    }
+
+
+    private async Task DownloadPptx(ListFileModel item)
+    {
+
+        try
+        {
+            display = "none";
+            displayAnim = "block";
+            nameClass = "btn-animation btn__progress btn__progress--fill";
+
+            string downloadFolder = "C:\\StemApp\\" + item.Id; // Đường dẫn thư mục theo Id
+            string folderGiaoAn = downloadFolder + "\\GiaoAn"; // Đường dẫn thư mục giáo án theo Id
+                                                               // Kiểm tra xem thư mục đã tồn tại hay chưa, nếu chưa thì tạo mới
+            if (!Directory.Exists(downloadFolder))
+            {
+                Directory.CreateDirectory(downloadFolder); // kiểm tra đã có folder chưa. chưa thì tạo
+            }
+
+            var nameFilePP = item.Name.Replace(" ", "") + ".pptx"; // tên file pptx
+            var nameFileThumb = "ImageThumb" + item.Name.Replace(" ", "") + item.Icon.Substring(item.Icon.IndexOf('.')); //tên file thumb
+
+            string tempFilePath1 = Path.Combine(downloadFolder, nameFilePP);  //tạo đường dẫn tạm thời file pptx
+            string tempFilePath2 = Path.Combine(downloadFolder, nameFileThumb); //tạo đường dẫn tạm thời file thumb
+
+            // Tải xuống tệp .pptx0
+            using (var client = new HttpClient())
+            {
+                var UrlFilePP = "https://stemschool.vn" + item.Url;  //url tải file pp
+                var UrlThumb = "https://stemschool.vn" + item.Icon; //url tải file ảnh thumb
+                var dataPP = await client.GetByteArrayAsync(UrlFilePP);  // tạo byte để tải file pp
+                var dataThumb = await client.GetByteArrayAsync(UrlThumb); // tạo byte để tải ảnh thumb
+                try
+                {
+                    await File.WriteAllBytesAsync(tempFilePath1, dataPP); // lưu file pptx vào folder
+                    await File.WriteAllBytesAsync(tempFilePath2, dataThumb); // lưu ảnh thumb vào folder
+
+                }
+                catch (Exception ex)
+                {
+                    await App.Current.MainPage.DisplayAlert("Error", "  Lỗi khi khi lưu file PowerPoint:"+ ex.Message, "OK");
+                }
+            }
+            if (!Directory.Exists(folderGiaoAn))
+            {
+                Directory.CreateDirectory(folderGiaoAn); // kiểm tra đã có folder chưa. chưa thì tạo
+            }
+
+            var imagePaths = JsonConvert.DeserializeObject<List<string>>(item.Screenshot); // lấy ra 3 ảnh mô tả
+            var count = 0;
+            foreach (string imagePath in imagePaths)
+            {
+                count++;
+                var nameFileImg = "ImgDescription" + count + imagePath.Substring(imagePath.IndexOf('.'));
+                string tempFileImgDesc = Path.Combine(folderGiaoAn, nameFileImg.Replace(" ", ""));
+                using (var client = new HttpClient())
+                {
+                    var UrlImgDesc = "https://stemschool.vn" + imagePath;
+                    var dataImgDesc = await client.GetByteArrayAsync(UrlImgDesc);
+                    try
+                    {
+                        await File.WriteAllBytesAsync(tempFileImgDesc, dataImgDesc); // lưu file pptx vào folder
+
+                    }
+                    catch (Exception ex)
+                    {
+                        await App.Current.MainPage.DisplayAlert("Error", "  Lỗi khi khi lưu file ảnh mô tả:" + ex.Message, "OK");
+                    }
+                }
+            }
+
+            List<FileDesc> lstFileDes = JsonConvert.DeserializeObject<List<FileDesc>>(item.FileDescription); // lấy ra các file mô tả
+
+            foreach (var itemFileDesc in lstFileDes)
+            {
+                var nameFileDesc = itemFileDesc.Url.Substring(itemFileDesc.Url.IndexOf("CMS/") + 4);
+                string tempFileDesc = Path.Combine(folderGiaoAn, nameFileDesc.Replace(" ", ""));
+                using (var client = new HttpClient())
+                {
+                    var UrlFileDesc = "https://stemschool.vn" + itemFileDesc.Url;
+                    var dataFileDesc = await client.GetByteArrayAsync(UrlFileDesc);
+                    try
+                    {
+                        await File.WriteAllBytesAsync(tempFileDesc, dataFileDesc);
+
+                    }
+                    catch (Exception ex)
+                    {
+                        await App.Current.MainPage.DisplayAlert("Error", "  Lỗi khi khi lưu file mô tả:" + ex.Message, "OK");
+                    }
+                }
+            }
+
+
+            string rootPath = AppDomain.CurrentDomain.BaseDirectory;
+            //string filePath = Path.Combine(rootPath, "data.json");
+            //await localStorage.SetItemAsync("name", "John Smith");
+            var jsonData = await localStorage.GetItemAsync<string>(KEY_PPTX);
+            if (!string.IsNullOrEmpty(jsonData))
+            {
+                //string jsonData = File.ReadAllText(filePath);
+                List<ListFileModel> dataList = JsonConvert.DeserializeObject<List<ListFileModel>>(jsonData);
+                // Add a new object to the list
+                bool alreadyExist = dataList.Any(x => x.Id == item.Id);
+                if (alreadyExist == false)
+                {
+                    dataList.Add(item);
+                    string updatedJson = JsonConvert.SerializeObject(dataList, Formatting.Indented);
+                    await localStorage.SetItemAsync(KEY_PPTX, updatedJson);
+                    // Write the updated JSON data back to the file
+                    //File.WriteAllText(filePath, updatedJson);
+                }
+
+            }
+            else
+            {
+                List<ListFileModel> dataList = new List<ListFileModel>();
+                dataList.Add(item);
+                // File.WriteAllText(filePath, JsonConvert.SerializeObject(item));
+                await localStorage.SetItemAsync(KEY_PPTX, JsonConvert.SerializeObject(dataList));
+            }
+
+            await Task.Delay(1000);
+            displayAnim = "none";
+            displayLstBtn = "flex";
+
+
+        }
+        catch (Exception ex)
+        {
+            displayAnim = "none";
+            displayLstBtn = "none";
+            display = "flex";
+            await App.Current.MainPage.DisplayAlert("Error", "  Lỗi hệ thống:" + ex.Message, "OK");
+        }
+
+
+    }
+
+    private async Task OpenPptx(ListFileModel item)
+    {
+
+        string downloadFolder = "C:\\StemApp\\" + item.Id; //Đường dẫn đến file pptx
+
+        var password = Decrypt(item.Password, privateKey);
+        // Kiểm tra xem thư mục đã tồn tại hay chưa, nếu chưa thì tạo mới
+        var nameFilePP = item.Name.Replace(" ", "") +".pptx";
+        // Đường dẫn đầy đủ tới tệp .pptx
+        string tempFilePath = Path.Combine(downloadFolder, nameFilePP);
+        try
+        {
+            Application powerPoint = new Microsoft.Office.Interop.PowerPoint.Application();
+
+            Presentations presentations = powerPoint.Presentations;
+            Presentation ps = null;
+            Thread openPPT = new Thread(delegate ()
+            {
+
+                presentations.Open(tempFilePath, MsoTriState.msoTrue, MsoTriState.msoFalse);
+
+            });
+
+            ps = powerPoint.ProtectedViewWindows.Open(tempFilePath, password, Microsoft.Office.Core.MsoTriState.msoFalse).Presentation;
+        } catch(Exception ex)
+        {
+            await App.Current.MainPage.DisplayAlert("Error", "  Lỗi hệ thống:" + ex.Message, "OK");
+        }
+
+
+    }
+
+    private async Task OpenGiaoAn(ListFileModel item)
+    {
+
+        string downloadFolder = "C:\\StemApp\\" + item.Id; // Đường dẫn thư mục theo Id
+        string folderGiaoAn = downloadFolder + "\\GiaoAn";
+
+        Process.Start("explorer.exe", folderGiaoAn);
+
+    }
+
+    private async Task deleteFile(ListFileModel item)
+    {
+        bool answer = await App.Current.MainPage.DisplayAlert("Xác nhận?", "Bạn có chắc chắn muốn xoá file " + item.Name, "Yes", "No");
+
+        string downloadFolder = "C:\\StemApp\\" + item.Id; // Đường dẫn thư mục theo Id
+        if (answer)
+        {
+            Directory.Delete(downloadFolder, true);
+            string rootPath = AppDomain.CurrentDomain.BaseDirectory;
+            // string filePath = Path.Combine(rootPath, "data.json");
+
+            // if (File.Exists(filePath))
+            // {
+            //     string jsonData = File.ReadAllText(filePath);
+            //     List<ListFileModel> dataList = JsonConvert.DeserializeObject<List<ListFileModel>>(jsonData);
+
+            //     bool alreadyExist = dataList.Any(x => x.Id == item.Id);
+            //     if (alreadyExist)
+            //     {
+            //         dataList.RemoveAll(x => x.Id == item.Id);
+            //         string updatedJson = JsonConvert.SerializeObject(dataList, Formatting.Indented);
+
+            //         // Write the updated JSON data back to the file
+            //         File.WriteAllText(filePath, updatedJson);
+            //     }
+
+            // }
+            var jsonData = await localStorage.GetItemAsync<string>(KEY_PPTX);
+            if (!string.IsNullOrEmpty(jsonData))
+            {
+                //string jsonData = File.ReadAllText(filePath);
+                List<ListFileModel> dataList = JsonConvert.DeserializeObject<List<ListFileModel>>(jsonData);
+                // Add a new object to the list
+                bool alreadyExist = dataList.Any(x => x.Id == item.Id);
+                if (alreadyExist == false)
+                {
+                    dataList.Add(item);
+                    string updatedJson = JsonConvert.SerializeObject(dataList, Formatting.Indented);
+                    await localStorage.SetItemAsync(KEY_PPTX, updatedJson);
+                    // Write the updated JSON data back to the file
+                    //File.WriteAllText(filePath, updatedJson);
+                }
+
+            }
+            if (type == 2)
+            {
+                itemFileOffline = "none";
+            }
+            displayLstBtn = "none";
+            display = "flex";
+        }
+        
+
+    }
+
+    public static string Decrypt(string encryptedText, string privateKey)
+    {
+        RSACryptoServiceProvider rsa = new RSACryptoServiceProvider();
+        rsa.FromXmlString(privateKey);
+
+        byte[] encryptedBytes = Convert.FromBase64String(encryptedText);
+        byte[] decryptedBytes = rsa.Decrypt(encryptedBytes, true);
+
+        return Encoding.UTF8.GetString(decryptedBytes);
+    }
+
+}

@@ -1,0 +1,57 @@
+﻿@page "/offline"
+@using MauiApp1.Services
+@using MauiApp1.Models
+@using Microsoft.Office.Core;
+@using Microsoft.Office.Interop.PowerPoint
+@using System.Diagnostics;
+@using System.Security.Cryptography;
+@using System.Text;
+@using Newtonsoft.Json;
+@inject IAppService AppService;
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<div class="main">
+    <div class="page-main">
+        <div class="row container">
+            <NavLink href="/">
+                <span class="btn btn-primary">Trở về</span>
+            </NavLink>
+            @if (lstData == null)
+            {
+                <h1>Bạn chưa tải file Powerpoint nào về.....</h1>
+            }
+            else
+            {
+                @foreach (var item in lstData)
+                {
+                    <SurveyPrompt item="@item" type="2"/>
+                }
+            }
+
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+
+@code {
+    List<ListFileModel> lstData = new List<ListFileModel>();
+    private string KEY_PPTX = "KEY-PPTX";
+    protected override async Task OnInitializedAsync()
+    {
+        var jsonData = await localStorage.GetItemAsync<string>(KEY_PPTX);
+
+        if (!string.IsNullOrEmpty(jsonData))
+        {
+            lstData = JsonConvert.DeserializeObject<List<ListFileModel>>(jsonData);
+        } else
+        {
+            await App.Current.MainPage.DisplayAlert("Error", "Không có file đã tải để dạy offline:", "OK");
+            Navigation.NavigateTo("/");
+        }
+    }
+}
+
